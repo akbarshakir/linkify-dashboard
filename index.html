@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>Linkify Orders Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <section id="loginPanel" class="login-wrap">
+      <div class="brand-mark">L</div>
+      <p class="eyebrow">LINKIFY · OPERATIONS</p>
+      <h1>Monthly Orders Dashboard</h1>
+      <p class="muted">Sign in with your existing Supabase user to open the dashboard.</p>
+      <form id="loginForm" class="login-form">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required placeholder="you@example.com">
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required placeholder="Your password">
+        <button class="btn primary full" type="submit">Sign in</button>
+        <p id="loginMessage" class="message" role="status"></p>
+      </form>
+      <p class="tiny muted">Your Google Sheet remains the source of truth. This dashboard reads it; it does not edit the sheet.</p>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark small">L</div>
+          <div><strong>Linkify</strong><span>Monthly Orders</span></div>
+        </div>
+        <div class="top-actions">
+          <span id="syncStatus" class="status"><i></i> Not synced yet</span>
+          <button id="syncBtn" class="btn primary">↻ Sync Now</button>
+          <button id="signOutBtn" class="btn secondary">Sign out</button>
+        </div>
+      </header>
+
+      <div class="intro">
+        <div>
+          <p class="eyebrow">OVERVIEW</p>
+          <h1>Orders dashboard</h1>
+          <p class="muted">Track client revenue, agency costs and profit in PKR.</p>
+        </div>
+        <span id="lastSynced" class="last-synced">Waiting for first sync</span>
+      </div>
+
+      <div id="errorBanner" class="error-banner hidden" role="alert"></div>
+
+      <section class="kpis">
+        <article class="kpi"><span>Total orders</span><strong id="kpiOrders">0</strong><small>Current orders</small></article>
+        <article class="kpi"><span>Client revenue</span><strong id="kpiRevenue">PKR 0</strong><small>Converted to PKR</small></article>
+        <article class="kpi"><span>Agency cost</span><strong id="kpiCost">PKR 0</strong><small>All current orders</small></article>
+        <article class="kpi"><span>Net profit</span><strong id="kpiProfit">PKR 0</strong><small>Revenue minus cost</small></article>
+      </section>
+
+      <section class="monthly-dashboard-card">
+        <div class="section-heading monthly-heading">
+          <div><h2 id="monthlyDashboardTitle">Monthly dashboard · All months</h2><p class="muted">These four cards update when you change the Month filter below.</p></div>
+          <span class="monthly-badge">Based on Month filter</span>
+        </div>
+        <div class="kpis monthly-kpis">
+          <article class="kpi"><span>Monthly orders</span><strong id="monthlyOrders">0</strong><small id="monthlyOrdersNote">All months combined</small></article>
+          <article class="kpi"><span>Monthly client revenue</span><strong id="monthlyRevenue">PKR 0</strong><small>Converted to PKR</small></article>
+          <article class="kpi"><span>Monthly agency cost</span><strong id="monthlyCost">PKR 0</strong><small>Agency/vendor costs</small></article>
+          <article class="kpi"><span>Monthly net profit</span><strong id="monthlyProfit">PKR 0</strong><small>Revenue minus cost</small></article>
+        </div>
+      </section>
+<section class="orders-card">
+        <div class="section-heading orders-heading">
+          <div><h2>Orders</h2><p class="muted">Filter, review and open live links</p></div>
+          <div class="view-switch">
+            <button class="view-btn active" data-view="current">Current Orders <b id="currentCount">0</b></button>
+            <button class="view-btn" data-view="preserved">Preserved <b id="preservedCount">0</b></button>
+          </div>
+        </div>
+
+        <div class="filters">
+          <input id="searchInput" type="search" placeholder="Search website, live URL, client, agency…">
+          <select id="monthFilter"><option value="">All months</option></select>
+          <select id="agencyFilter"><option value="">All agencies</option></select>
+          <select id="clientFilter"><option value="">All clients</option></select>
+          <select id="currencyFilter"><option value="">All currencies</option><option value="USD">USD</option><option value="PKR">PKR</option></select>
+        </div>
+        <div class="export-bar">
+          <div class="export-copy"><strong>Export filtered orders</strong><span>Exports only the records currently shown by your search and filters.</span></div>
+          <div class="export-buttons">
+            <button id="exportClientBtn" class="btn secondary" type="button">↓ Export Client Excel</button>
+            <button id="exportAgencyBtn" class="btn primary" type="button">↓ Export Agency Excel</button>
+          </div>
+        </div>
+        <p id="exportMessage" class="export-message" role="status" aria-live="polite"></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Website</th><th>Client</th><th>Agency / Vendor</th><th>Live link</th><th>Agency price</th><th>Client price</th><th>Profit (PKR)</th><th>Month</th>
+            </tr></thead>
+            <tbody id="ordersBody"><tr><td colspan="8" class="empty">Click Sync Now to load orders.</td></tr></tbody>
+          </table>
+        </div>
+        <div id="mobileOrders" class="mobile-orders"></div>
+        <div class="table-footer"><span id="resultsCount">0 orders</span><span>Read-only · Source: Google Sheets</span></div>
+      </section>
+      <footer>Linkify dashboard <span>·</span> Financial totals are shown in PKR.</footer>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
