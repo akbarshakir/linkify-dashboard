@@ -1,9 +1,8 @@
-### Part 1 of 4
-
-```javascript
 /*
  * LINKIFY DASHBOARD CONFIG
- * Monthly tabs are discovered automatically from the Google Spreadsheet.
+ * 1) Paste your Supabase URL and publishable key below.
+ * 2) Put your Google spreadsheet ID in SPREADSHEET_ID.
+ * 3) Keep the exact tab names in SHEET_TABS. Add new month tab names here as you create them.
  * Never paste a Google private key or Supabase service-role key into this browser file.
  */
 const CONFIG = {
@@ -11,6 +10,9 @@ const CONFIG = {
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_IbZnNomkcysrP3s2rW7IBA_Qj0XAusf",
   SPREADSHEET_ID: "1mnA7uwwDDePadQ5irlmaQ0gk67awQyHHmIAi6NCvzeo",
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyYiFgDek0lE7fWo5LWzz-5ZttuOaRempD3EmVoiNQA4YHEiNf6RK63oOz96xGdannl/exec",
+  // Fetch both September and October 2026. Add each new monthly tab here when it is created.
+  SHEET_TABS: ["September 26", "October 26"],
+  // If the sheet's first row is a title instead of column headers, change this to 2.
   HEADER_ROW: 1
 };
 
@@ -45,6 +47,7 @@ function formatMoney(value, currency) {
   return (currency || "PKR") + " " + n.toLocaleString("en-PK", {maximumFractionDigits: 2});
 }
 function monthLabel(dateValue, tabName) {
+  // Prefer the monthly tab name so every order stays grouped under its source month.
   const tabMatch = String(tabName || "").match(/^([A-Za-z]+)\s+(\d{2}|\d{4})$/);
   if (tabMatch) {
     const monthDate = new Date(`${tabMatch[1]} 1, ${tabMatch[2].length === 2 ? "20" + tabMatch[2] : tabMatch[2]}`);
@@ -90,6 +93,8 @@ function cellValue(row, headers, alternatives) {
   if (idx < 0 || !row[idx]) return "";
   return row[idx].f ?? row[idx].v ?? "";
 }
+// Extract a URL from a cell, prioritizing the actual rich-text hyperlink target.
+// In Google Sheets, a cell may display a title while its real URL is stored in `l`.
 function urlFromCell(cell) {
   if (!cell) return "";
   const isUrl = (value) => typeof value === "string" && /^(https?:\/\/|www\.)/i.test(value.trim());
@@ -104,6 +109,9 @@ function urlCellValue(row, headers, alternatives) {
     const found = urlFromCell(row[idx]);
     if (found) return found;
   }
+  // Fallback: some vendor sheets put the live hyperlink under an unexpected
+  // column heading. Search all linked cells, preferring columns whose headings
+  // look like live/published/article/post/URL fields.
   const preferredWords = /live|publish|article|post|link|url/i;
   const orderedIndexes = headers.map((header, i) => ({i, preferred: preferredWords.test(String(header || ""))}))
     .sort((a, b) => Number(b.preferred) - Number(a.preferred));
@@ -111,6 +119,7 @@ function urlCellValue(row, headers, alternatives) {
     const found = urlFromCell(row[item.i]);
     if (found) return found;
   }
+  // Last fallback for sheets where the target URL itself is plain text.
   for (const cell of (row || [])) {
     const found = urlFromCell(cell);
     if (found) return found;
@@ -156,6 +165,7 @@ function fetchAppsScriptTab(tabName, attempt = 1) {
       finished = true;
       cleanup();
       if (retryable && attempt < 2) {
+        // Retry once after a short pause. Apps Script may be slow to wake up.
         setTimeout(() => fetchAppsScriptTab(tabName, attempt + 1).then(resolve).catch(reject), 1200);
       } else {
         reject(new Error(message));
@@ -184,6 +194,8 @@ function fetchAppsScriptTab(tabName, attempt = 1) {
       fail("The browser could not load the Apps Script response for “" + tabName + "”. Check the /exec URL, deployment access = Anyone, and Google account permissions.", true);
     };
 
+    // A successful script download should call the JSONP callback. If it loads
+    // without calling it, the deployed script is probably returning HTML/old code.
     script.onload = () => {
       loadTimer = setTimeout(() => {
         if (!finished) fail("Apps Script loaded but did not call its JSONP callback for “" + tabName + "”. Open the /exec URL with ?tab=" + encodeURIComponent(tabName) + "&callback=test. If it does not start with test({, save Code.gs and deploy a New version.", true);
@@ -197,7 +209,9 @@ function fetchAppsScriptTab(tabName, attempt = 1) {
     document.head.appendChild(script);
   });
 }
+
 async function fetchSheetTab(tabName) {
+  // Read actual hyperlink targets, including rich-text links that GViz can omit.
   const payload = await fetchAppsScriptTab(tabName);
   if (!Array.isArray(payload.headers) || !Array.isArray(payload.rows)) throw new Error("Unexpected data for tab “" + tabName + "”. Check Code.gs and redeploy the Web App.");
   const parsed = {headers: payload.headers, rows: payload.rows.map(row => (row || []).map(cell => cell ? ({v:cell.v, f:cell.f, l:cell.l}) : null))};
@@ -253,85 +267,12 @@ async function fetchSheetTab(tabName) {
   }
   return output;
 }
-
-async function fetchAppsScriptTabs() {
-  return new Promise((resolve, reject) => {
-    const endpoint = String(CONFIG.APPS_SCRIPT_URL || "").trim();
-
-    if (!endpoint || endpoint.includes("PASTE_YOUR_APPS_SCRIPT")) {
-      reject(new Error("Apps Script URL is missing. Paste your deployed Web App URL into CONFIG.APPS_SCRIPT_URL."));
-      return;
-    }
-
-    const callbackName = "__linkifyTabsCallback_" + Date.now() + "_" +
-      Math.random().toString(36).slice(2);
-    const script = document.createElement("script");
-    let finished = false;
-
-    const cleanup = () => {
-      clearTimeout(timer);
-      script.onload = null;
-      script.onerror = null;
-      if (script.parentNode) script.parentNode.removeChild(script);
-      try {
-        delete window[callbackName];
-      } catch (_) {
-        window[callbackName] = undefined;
-      }
-    };
-
-    const fail = message => {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      reject(new Error(message));
-    };
-
-    const timer = setTimeout(() => {
-      fail("Google Sheet monthly tabs could not be loaded. Check the Apps Script deployment.");
-    }, 30000);
-
-    window[callbackName] = payload => {
-      if (finished) return;
-      finished = true;
-      cleanup();
-
-      if (!payload || payload.error) {
-        reject(new Error(payload && payload.error ? payload.error : "Invalid monthly tabs response."));
-      } else if (!Array.isArray(payload.tabs)) {
-        reject(new Error("Apps Script did not return a valid monthly tabs list."));
-      } else {
-        resolve(payload.tabs);
-      }
-    };
-
-    script.onerror = () => {
-      fail("Could not connect to Apps Script to discover monthly tabs. Check the Web App URL and access settings.");
-    };
-
-    const separator = endpoint.includes("?") ? "&" : "?";
-    script.src = endpoint + separator + "action=listTabs" +
-      "&callback=" + encodeURIComponent(callbackName) + "&_=" + Date.now();
-    script.async = true;
-    document.head.appendChild(script);
-  });
-}
-
 async function fetchAllOrders() {
-  if (!CONFIG.SPREADSHEET_ID || CONFIG.SPREADSHEET_ID.includes("PASTE_")) {
-    throw new Error("Add your Google Spreadsheet ID in script.js.");
-  }
-
-  const tabs = await fetchAppsScriptTabs();
-
-  if (!tabs.length) {
-    throw new Error("No monthly tabs found in the Google Spreadsheet.");
-  }
-
-  const results = await Promise.all(tabs.map(fetchSheetTab));
+  if (!CONFIG.SPREADSHEET_ID || CONFIG.SPREADSHEET_ID.includes("PASTE_")) throw new Error("Add your Google Spreadsheet ID in script.js.");
+  if (!CONFIG.SHEET_TABS.length) throw new Error("Add at least one monthly tab name in CONFIG.SHEET_TABS.");
+  const results = await Promise.all(CONFIG.SHEET_TABS.map(fetchSheetTab));
   return results.flat();
 }
-
 function showError(message) {
   errorBanner.textContent = message;
   errorBanner.classList.remove("hidden");
@@ -450,6 +391,7 @@ function exportFilteredXlsx(kind) {
     ? [{wch:32},{wch:65},{wch:18}]
     : [{wch:28},{wch:32},{wch:65},{wch:18}];
   ws["!autofilter"] = {ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length,c:headers.length-1}})};
+  // Keep price values numeric so the recipient can sort, sum, and calculate in Excel.
   for (let i = 0; i < orders.length; i++) {
     const rowNum = i + 2;
     const priceCol = isClient ? 2 : 3;
@@ -503,6 +445,7 @@ function saveSnapshot(orders) {
   try {
     const old = JSON.parse(localStorage.getItem(CACHE_KEY) || "[]");
     const newById = new Map(orders.map(o=>[o.id,o]));
+    // Keep earlier rows that disappeared from a successfully read tab as preserved.
     const missing = old.filter(o=>!newById.has(o.id)).map(o=>({...o,preserved:true}));
     const fresh = orders.map(o=>({...o,preserved:false}));
     const snapshots = [...fresh, ...missing.filter(o=>!newById.has(o.id))];
