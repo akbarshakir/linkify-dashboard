@@ -11,7 +11,7 @@ const CONFIG = {
   SPREADSHEET_ID: "1mnA7uwwDDePadQ5irlmaQ0gk67awQyHHmIAi6NCvzeo",
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyYiFgDek0lE7fWo5LWzz-5ZttuOaRempD3EmVoiNQA4YHEiNf6RK63oOz96xGdannl/exec",
   // Fetch both September and October 2026. Add each new monthly tab here when it is created.
-  SHEET_TABS: ["September 26", "October 26", "November 26"],
+  SHEET_TABS: ["August 26","September 26", "October 26", "November 26"],
   // If the sheet's first row is a title instead of column headers, change this to 2.
   HEADER_ROW: 1
 };
